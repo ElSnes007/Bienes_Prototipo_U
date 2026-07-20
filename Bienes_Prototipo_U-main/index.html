@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Prototipo - Sistema de Traslados UNELLEZ</title>
+        <link href="bootstrap.min.css" rel="stylesheet">
+
+        
+        <link rel="stylesheet" href="bootstrap-icons.min.css">
+        
+        <!-- ENLACE A LOS INVENTARIOS POR ÁREA -->
+        <script src="inventarios/prensa.js"></script>
+        <script src="inventarios/soporte.js"></script>
+        <script src="inventarios/arse.js"></script>
+
+        <style>
+            /* =========================================================================
+            1. ESTILOS GENERALES E INTERFAZ FLOTANTE
+            ========================================================================= */
+            .btn-flotante {
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                z-index: 1000;
+                box-shadow: 0px 4px 10px rgba(0,0,0,0.2);
+            }
+        
+            /* Estilo base para el input de descripción autocompletado */
+            .fila-bien input[name="descBien"] {
+                transition: background-color 0.3s ease;
+            }
+        
+            /* =========================================================================
+            2. REGLAS ESPECÍFICAS PARA MODO OSCURO (Bootstrap 5.3)
+            ========================================================================= */
+            [data-bs-theme="dark"] {
+                /* Fuerza que cualquier tarjeta cambie su fondo al gris oscuro de Bootstrap */
+                .card {
+                    background-color: var(--bs-card-bg) !important;
+                    border-color: var(--bs-border-color-translucent) !important;
+                }
+        
+                /* ELIMINA EL FONDO BLANCO: Forzar transparencia en cualquier contenedor interno de bienes */
+                .card-body, 
+                #listaCamposBienes, 
+                .p-3.border.rounded,
+                div[style*="background-color: white"],
+                div[style*="background: white"],
+                .bg-white,
+                .bg-light {
+                    background-color: transparent !important;
+                    background: transparent !important;
+                    color: var(--bs-body-color) !important;
+                }
+        
+                /* Asegura que los bordes internos no sean blancos ni chillones */
+                .border, .border-bottom {
+                    border-color: var(--bs-border-color-translucent) !important;
+                }
+        
+                /* Ajuste estético para la etiqueta UNELLEZ VIPI del encabezado */
+                .badge.bg-white {
+                    background-color: #212529 !important;
+                    color: #fff !important;
+                    border: 1px solid #495057;
+                }
+        
+                /* Hace visibles los placeholders (textos de ejemplo) sobre los inputs oscuros */
+                .form-control::placeholder {
+                    color: rgba(255, 255, 255, 0.5) !important;
+                }
+        
+                /* Mantiene el texto oscuro y perfectamente legible cuando el input se pinte de verde */
+                .fila-bien input[name="descBien"] {
+                    color: #212529 !important;
+                }
+            }
+        </style>
+
+    </head>
+
+    <body class="bg-light">
+
+        <div class="container mt-3 text-end">
+            <div class="form-check form-switch d-inline-block">
+                <input class="form-check-input" type="checkbox" id="selectorTema">
+                <label class="form-check-label fw-bold" for="selectorTema" id="etiquetaTema">🌙 Modo Oscuro</label>
+            </div>
+        </div>
+
+        <div class="container mt-5">
+            <div class="row justify-content-center">
+                <div class="col-md-8">
+                    
+                    <div class="card shadow mb-5">
+                        <div class="card-header text-white d-flex align-items-center justify-content-between" style="background-color: #e28409;">
+                            <h3 class="card-title mb-0">Generador de Documento de Traslado</h3>
+                            <span class="badge" style="background-color: #ffffff; color: #e28409;">UNELLEZ VIPI</span>
+                        </div>
+                        <div class="card-body">
+                            <form id="formTraslado">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Origen del Traslado (Obligatorio)</label>
+                                    <input type="text" class="form-control" id="origen" placeholder="Ej. Unidad de Bienes UNELLEZ" required>
+                                </div> 
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Destino del Traslado (Obligatorio)</label>
+                                    <input type="text" class="form-control" id="destino" placeholder="Ej. Rectorado / Almacén Operativo" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Motivo del Traslado (Obligatorio)</label>
+                                    <select class="form-control" id="motivo" required>
+                                        <option value="" disabled selected>Seleccione una opción...</option>
+                                        <option value="Mantenimiento Preventivo / Correctivo">Mantenimiento Preventivo / Correctivo</option>
+                                        <option value="Reparación Técnica">Reparación Técnica</option>
+                                        <option value="Reasignación de Departamento">Reasignación de Departamento</option>
+                                        <option value="Resguardo / Custodia">Resguardo / Custodia</option>
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="responsable" class="form-label fw-bold">Responsable del Traslado (Obligatorio)</label>
+                                    <input type="text" class="form-control" id="responsable" placeholder="Ej. Ing. José Cristancho" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Cantidad de Bienes</label>
+                                    <div class="d-flex gap-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="tipoBien" id="bienUnico" value="unico" checked>
+                                            <label class="form-check-label" for="bienUnico">Un solo bien</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="tipoBien" id="bienVarios" value="varios">
+                                            <label class="form-check-label" for="bienVarios">Varios bienes (Lista)</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div id="contenedorBienes" class= "card card-body mb-3">
+                                    <h5 class="card-title h6 fw-bold text-muted mb-3">Especificación de los Bienes</h5>
+                                    
+                                    <div id="listaCamposBienes">
+                                        <div class="row g-2 mb-2 fila-bien">
+                                            <div class="col-md-4">
+                                                <input type="text" class="form-control" placeholder="Código de Bien (Ej. UNELLEZ-01)" required name="codigoBien">
+                                            </div>
+                                            <div class="col-md-8">
+                                                <input type="text" class="form-control" placeholder="Descripción (Ej. Monitor HP, Silla de Oficina...)" required name="descBien">
+                                            </div>
+                                        </div>
+                                    </div>
+                                
+                                    <button type="button" class="btn btn-sm btn-outline-primary mt-2 d-none" id="btnAgregarBien">
+                                        <i class="bi bi-plus-circle"></i> Añadir otro bien
+                                    </button>
+                                </div>
+                                <button type="submit" class="btn btn-success w-100 fw-bold py-2">
+                                    <i class="bi bi-file-earmark-pdf-fill"></i> Generar Documento PDF
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    
+                <div style="position: absolute; left: -9999px; top: 0; width: 794px;">
+        <div id="plantillaPDF" style="padding: 30px; font-family: Arial, sans-serif; color: #333; background-color: white; box-sizing: border-box;">
+            
+            <table style="width: 100%; border-bottom: 3px solid #198754; padding-bottom: 10px; margin-bottom: 20px; border-collapse: collapse;">
+                <tr>
+                    <td style="width: 25%; text-align: left; vertical-align: middle;">
+                        <img src="Logo_UNELLEZ.png" alt="Logo UNELLEZ" style="width: 65px; height: auto; display: block;" crossorigin="anonymous">
+                    </td>
+                    <td style="width: 75%; text-align: right; vertical-align: middle;">
+                        <h2 style="margin: 0; color: #0d6efd; text-transform: uppercase; font-size: 18px; font-weight: bold; letter-spacing: 0.5px;">UNELLEZ VIPI</h2>
+                        <h3 style="margin: 4px 0 0 0; color: #333; text-transform: uppercase; font-size: 14px; letter-spacing: 1px;">Documento Oficial de Traslado</h3>
+                        <small style="color: #666; font-size: 10px;">Control y Agilización de Procesos Administrativos</small>
+                    </td>
+                </tr>
+            </table>
+            
+            <p style="text-align: right; margin-bottom: 20px; font-size: 13px;"><strong>Fecha de Emisión:</strong> <span id="pdfFecha"></span></p>
+            
+            <div style="margin-bottom: 25px; background-color: #f8f9fa; padding: 20px; border-radius: 5px; border-left: 5px solid #0d6efd; line-height: 1.5;">
+                <p style="margin: 0 0 15px 0; font-size: 14px; text-align: justify;">
+                    Por medio del presente documento institucional, se hace constar y se autoriza formalmente la movilización, despacho y traslado de los bienes que correspondan, siguiendo la ruta establecida bajo las directrices administrativas vigentes:
+                </p>
+                
+                <table style="width: 100%; border-collapse: collapse; background: white;">
+                    <tr>
+                        <td style="padding: 10px 12px; width: 35%; font-weight: bold; border: 1px solid #dee2e6; background-color: #f1f3f5; font-size: 12px;">PUNTO DE ORIGEN:</td>
+                        <td style="padding: 10px 12px; border: 1px solid #dee2e6; font-size: 13px; font-weight: bold; color: #0d6efd;" id="pdfOrigen"></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px 12px; font-weight: bold; border: 1px solid #dee2e6; background-color: #f1f3f5; font-size: 12px;">PUNTO DE DESTINO:</td>
+                        <td style="padding: 10px 12px; border: 1px solid #dee2e6; font-size: 13px; font-weight: bold; color: #198754;" id="pdfDestino"></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px 12px; font-weight: bold; border: 1px solid #dee2e6; background-color: #f1f3f5; font-size: 12px;">MOTIVO DEL TRASLADO:</td>
+                        <td style="padding: 10px 12px; border: 1px solid #dee2e6; font-size: 13px; font-weight: bold; color: #495057;" id="pdfMotivo"></td>
+                    </tr>
+                    <tr>
+                    <td style="padding: 10px 12px; font-weight: bold; border: 1px solid #dee2e6; background-color: #f1f3f5; font-size: 12px;">RESPONSABLE:</td>
+                    <td style="padding: 10px 12px; border: 1px solid #dee2e6; font-size: 13px; font-weight: bold; color: #495057;" id="pdfResponsable"></td>
+                </tr>
+                </table>
+            </div>
+
+            <div style="margin-bottom: 25px;">
+                <h4 style="font-size: 12px; text-transform: uppercase; margin: 0 0 10px 0; color: #fda90d; border-bottom: 1px solid #dee2e6; padding-bottom: 4px;">
+                    Descripción Detallada de los Bienes Trasladados
+                </h4>
+                <table style="width: 100%; border-collapse: collapse; background: white;">
+                    <thead>
+                        <tr style="background-color: #f1f3f5; border: 1px solid #dee2e6;">
+                            <th style="padding: 8px 12px; text-align: left; width: 30%; font-size: 11px; font-weight: bold; border: 1px solid #dee2e6;">CÓDIGO DE BIEN</th>
+                            <th style="padding: 8px 12px; text-align: left; width: 70%; font-size: 11px; font-weight: bold; border: 1px solid #dee2e6;">DESCRIPCIÓN / ESPECIFICACIONES</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pdfListaBienes">
+                        </tbody>
+                </table>
+            </div>
+
+            <p style="margin: 20px 0; font-size: 11px; color: #777; font-style: italic; text-align: center; border-top: 1px dashed #ccc; padding-top: 12px;">
+                Nota: Este documento es valido dentro de las instalaciones de la UNELLEZ VIPI.
+            </p>
+            
+            <table style="width: 100%; margin-top: 60px; border-collapse: collapse;">
+                <tr>
+                    <td style="width: 40%; text-align: center; border-top: 1px solid #333; padding-top: 6px;">
+                        <p style="margin: 0; font-size: 12px; font-weight: bold; color: #333;">Firma Autorizada</p>
+                        <small style="color: #666; font-size: 10px;">Unidad de Bienes</small>
+                    </td>
+                    <td style="width: 20%;"></td>
+                    <td style="width: 40%; text-align: center; border-top: 1px solid #333; padding-top: 6px;">
+                        <p style="margin: 0; font-size: 12px; font-weight: bold; color: #333;">Firma de Conformidad</p>
+                        <small style="color: #666; font-size: 10px;">Área Receptora</small>
+                    </td>
+                </tr>
+            </table>
+        </div>
+            <table class="seccion-firmas" style="width: 100%; margin-top: 50px; border-collapse: collapse;">
+                <tr>
+                    <td style="width: 40%; text-align: center; border-top: 1px solid #333; padding-top: 6px;">
+                        <p style="margin: 0; font-size: 12px; font-weight: bold; color: #333;">Firma Autorizada</p>
+                        <small style="color: #666; font-size: 10px;">Unidad de Bienes</small>
+                    </td>
+                    <td style="width: 20%;"></td>
+                    <td style="width: 40%; text-align: center; border-top: 1px solid #333; padding-top: 6px;">
+                        <p style="margin: 0; font-size: 12px; font-weight: bold; color: #333;">Firma de Conformidad</p>
+                        <small style="color: #666; font-size: 10px;">Área Receptora</small>
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-dark btn-flotante d-flex align-items-center gap-2 rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalCreadores" style="position: fixed; bottom: 20px; right: 20px; z-index: 1000; box-shadow: 0px 4px 10px rgba(0,0,0,0.2);">
+            <i class="bi bi-people-fill"></i> Desarrolladores
+        </button>
+
+        <div class="modal fade" id="modalCreadores" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header bg-dark text-white">
+                        <h5 class="modal-title"><i class="bi bi-code-slash text-warning"></i> Equipo de Desarrollo</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-shadow="none" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body text-center">
+                        <p class="text-muted mb-4">Este sistema fue diseñado y estructurado como un prototipo funcional para la demostracion y utilidad del sistema a futuro.</p>
+                        <h6 class="fw-bold border-bottom pb-2 mb-3 text-secondary">Autores del Proyecto:</h6>
+                        <ul class="list-group list-group-flush text-start fw-medium">
+                            <li class="list-group-item"><i class="bi bi-person-fill text-primary"></i> Ali Martinez</li>
+                            <li class="list-group-item"><i class="bi bi-person-fill text-primary"></i> Luis Sanchez</li>
+                            <li class="list-group-item"><i class="bi bi-person-fill text-primary"></i> Alejandro Lezma</li>
+                            <li class="list-group-item"><i class="bi bi-person-fill text-primary"></i> Dunca Perez</li>
+                        </ul>
+                    </div>
+                    <div class="modal-footer justify-content-center bg-light">
+                        <small class="text-muted">Prototipo de Aplicación Web © 2026</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row g-2 mb-3 p-2 bg-light rounded border">
+            <div class="col-md-4">
+                <label class="form-label small fw-bold text-muted mb-1">📢 Nombre de la Nueva Área</label>
+                <input type="text" id="nombreNuevaArea" class="form-control form-control-sm" placeholder="Ej: RECTORADO o ODONTOLOGIA">
+            </div>
+            <div class="col-md-5">
+                <label class="form-label small fw-bold text-muted mb-1">📂 Seleccionar Archivo CSV (Excel)</label>
+                <div class="input-group input-group-sm">
+                    <input type="file" id="archivoImportar" class="form-control" accept=".csv, .txt">
+                    <button class="btn btn-primary" type="button" onclick="importarNuevoInventario()">
+                        <i class="bi bi-box-arrow-in-down"></i> Importar
+                    </button>
+                </div>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="button" class="btn btn-sm btn-outline-danger w-100" onclick="eliminarBaseDatosLocal()">
+                    <i class="bi bi-trash3-fill"></i> Eliminar BD Local
+                </button>
+            </div>
+        </div>
+
+        <!-- SECCIÓN DE CONSULTA DE INVENTARIOS INSTITUCIONALES -->
+        <div class="card card-body mb-3 mt-4">
+            <h5 class="card-title h6 fw-bold text-muted mb-3">📦 Visor de Inventarios por Área</h5>
+            
+            <!-- Botones de Selección tipo Icono -->
+            <div class="row g-2 mb-3 text-center">
+                <div class="col-4 col-md-3">
+                    <button type="button" class="btn btn-outline-primary w-100 p-3" onclick="cargarAreaConsultada('prensa', 'camera-video', 'Oficina de Prensa')">
+                        <i class="bi bi-camera-video fs-3 d-block mb-1"></i>
+                        <small class="fw-bold">Prensa</small>
+                    </button>
+                </div>
+                <div class="col-4 col-md-3">
+                    <button type="button" class="btn btn-outline-success w-100 p-3" onclick="cargarAreaConsultada('soporte', 'cpu', 'Soporte Técnico')">
+                        <i class="bi bi-cpu fs-3 d-block mb-1"></i>
+                        <small class="fw-bold">Soporte</small>
+                    </button>
+                </div>
+                <div class="col-4 col-md-3">
+                    <button type="button" class="btn btn-outline-warning w-100 p-3" onclick="cargarAreaConsultada('arse', 'person-vcard', 'Oficina ARSE')">
+                        <i class="bi bi-person-vcard fs-3 d-block mb-1"></i>
+                        <small class="fw-bold">ARSE</small>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Contenedor de la Tabla (Inicialmente oculto hasta que seleccionen un área) -->
+            <div id="seccionTablaInventario" class="mt-4 p-3 border rounded bg-card d-none">
+    
+            <div class="d-flex justify-content-between align-items-center mb-3">
+            <button type="button" class="btn btn-outline-danger btn-sm" onclick="cerrarVisor()">
+                <i class="bi bi-x-circle"></i> Cerrar Vista
+            </button>
+                
+                <h3 class="m-0 fs-5 fw-bold">
+                    <i id="iconoAreaTitulo" class="bi bi-folder-symlink text-primary me-2"></i>
+                    <span id="nombreAreaTitulo">ÁREA SELECCIONADA</span>
+                </h3>
+                <button type="button" class="btn btn-success btn-sm" onclick="exportarAreaAExcel()">
+                    <i class="bi bi-file-earmark-excel me-1"></i> Exportar a Excel
+                </button>
+            </div>
+            
+            <script>
+                function cerrarVisor() {
+                    // Ocultar la tabla
+                    document.getElementById('seccionTablaInventario').classList.add('d-none');
+                    // Mostrar nuevamente el formulario principal
+                    document.querySelector('.card.shadow.mb-5').classList.remove('d-none');
+                }
+            </script>
+
+            <div class="mb-3">
+                <div class="input-group">
+                    <span class="input-group-text bg-body-tertiary"><i class="bi bi-search"></i></span>
+                    <input type="text" id="buscadorExcel" class="form-control" placeholder="Buscar por código o descripción en esta área activa...">
+                </div>
+            </div>
+
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-sm table-hover m-0" style="border-collapse: collapse;">
+                    <thead>
+                        <tr class="table-secondary text-center sticky-top" style="top: 0; z-index: 2;">
+                            <th style="border: 1px solid #dee2e6; width: 30%;">CÓDIGO DE BIEN</th>
+                            <th style="border: 1px solid #dee2e6;">DESCRIPCIÓN DETALLADA</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cuerpoTablaExcel">
+                        </tbody>
+                </table>
+             </div>
+         </div>
+        </div>
+
+        <script src="bootstrap.bundle.min.js"></script>
+        <script src="html2pdf.bundle.min.js"></script>
+
+        <script>
+            // =========================================================================
+            // 1. CARGA, PERSISTENCIA MÓDULAR E IMPORTACIÓN DE INVENTARIOS LOCALES
+            // =========================================================================
+            window.InventarioAreas = window.InventarioAreas || {};
+            let BDBienes = {}; 
+            let baseDatosAreaActual = {};
+
+            // Al cargar la página, consolidamos datos y dibujamos áreas personalizadas
+            document.addEventListener("DOMContentLoaded", function() {
+                inicializarSistemaInventarios();
+            });
+
+            function inicializarSistemaInventarios() {
+                BDBienes = {}; // Resetear mapa general
+                
+                // 1. Cargar áreas estáticas del head (Prensa, Soporte, Arse)
+                Object.keys(window.InventarioAreas).forEach(area => {
+                    BDBienes = { ...BDBienes, ...window.InventarioAreas[area] };
+                });
+
+                // 2. Cargar áreas guardadas en el navegador (localStorage) por el usuario
+                const inventarioLocalGuardado = JSON.parse(localStorage.getItem("unellez_bd_local")) || {};
+                
+                // Inyectar las áreas locales en la interfaz creando sus botones dinámicamente
+                const contenedorIconos = document.querySelector("#seccionTablaInventario")?.previousElementSibling;
+                if (contenedorIconos && contenedorIconos.classList.contains("row")) {
+                    // Remover botones dinámicos viejos para no duplicar al recargar
+                    document.querySelectorAll(".btn-area-dinamica").forEach(el => el.closest('.col-4').remove());
+                    
+                    Object.keys(inventarioLocalGuardado).forEach(nombreArea => {
+                        // Combinar en la base de datos global de autocompletado
+                        BDBienes = { ...BDBienes, ...inventarioLocalGuardado[nombreArea] };
+                        
+                        // Crear el botón tipo Icono dinámico para la nueva área
+                        const col = document.createElement("div");
+                        col.className = "col-4 col-md-3";
+                        col.innerHTML = `
+                            <button type="button" class="btn btn-outline-info w-100 p-3 btn-area-dinamica" 
+                                    onclick="cargarAreaDinamica('${nombreArea}')">
+                                <i class="bi bi-folder-symlink fs-3 d-block mb-1"></i>
+                                <small class="fw-bold text-truncate d-block">${nombreArea}</small>
+                            </button>
+                        `;
+                        contenedorIconos.appendChild(col);
+                    });
+                }
+            }
+
+            // Carga de áreas precargadas (.js)
+            function cargarAreaConsultada(area, icono, nombreFormateado) {
+                baseDatosAreaActual = window.InventarioAreas[area] || {};
+                mostrarTablaExcelEnInterfaz(icono, nombreFormateado);
+            }
+
+            // Carga de áreas importadas (localStorage)
+            function cargarAreaDinamica(nombreArea) {
+                const inventarioLocalGuardado = JSON.parse(localStorage.getItem("unellez_bd_local")) || {};
+                baseDatosAreaActual = inventarioLocalGuardado[nombreArea] || {};
+                mostrarTablaExcelEnInterfaz('folder-symlink', nombreArea);
+            }
+
+            // DESPLIEGUE COMÚN DE LA TABLA: Vincula el buscador inferior dinámicamente
+            function mostrarTablaExcelEnInterfaz(icono, titulo) {
+             // Prueba de scroll a los bienes del area seleccionada por el vision XD
+                // 1. Ocultar el Generador de Traslado
+                const formTraslado = document.querySelector('.card.shadow.mb-5'); // Ajusta este selector si es necesario
+                if (formTraslado) formTraslado.classList.add('d-none');
+
+                // 2. Mostrar la tabla
+                const contenedorTabla = document.getElementById('seccionTablaInventario');
+                if (contenedorTabla) contenedorTabla.classList.remove('d-none');
+
+                // 3. Scroll hacia arriba suave
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+                reconstruirTablaExcel(baseDatosAreaActual);
+
+                // (El resto de tu lógica para pintar iconos y nombres sigue igual)
+                const iconoTitulo = document.getElementById('iconoAreaTitulo');
+                if (iconoTitulo) iconoTitulo.className = `bi bi-${icono} text-primary`;
+                const textoTitulo = document.getElementById('nombreAreaTitulo');
+                if (textoTitulo) textoTitulo.innerText = titulo;
+                
+                // Limpiamos el texto del buscador inferior al cambiar de área
+                const inputBuscador = document.getElementById('buscadorExcel');
+                if (inputBuscador) {
+                    inputBuscador.value = '';
+                    
+                    // CONFIGURACIÓN DEL BUSCADOR DE ABAJO: Filtra estrictamente la tabla inferior
+                    inputBuscador.oninput = function() {
+                        const busqueda = this.value.toUpperCase().trim();
+                        const resultadoFiltrado = {};
+
+                        Object.keys(baseDatosAreaActual).forEach(codigo => {
+                            const descripcion = baseDatosAreaActual[codigo].toUpperCase();
+                            if (codigo.includes(busqueda) || descripcion.includes(busqueda)) {
+                                resultadoFiltrado[codigo] = baseDatosAreaActual[codigo];
+                            }
+                        });
+                        reconstruirTablaExcel(resultadoFiltrado);
+                    };
+                }
+
+                // Dibujamos la tabla inicialmente con todos los datos del área elegida
+                reconstruirTablaExcel(baseDatosAreaActual);
+            }
+
+            function reconstruirTablaExcel(datosFiltrados) {
+                const tbody = document.getElementById('cuerpoTablaExcel');
+                if (!tbody) return;
+                tbody.innerHTML = '';
+                const claves = Object.keys(datosFiltrados);
+                
+                if (claves.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="2" class="text-center text-muted py-3">No se encontraron registros en esta área</td></tr>`;
+                    return;
+                }
+
+                claves.forEach(codigo => {
+                    const fila = document.createElement('tr');
+                    fila.innerHTML = `
+                        <td class="text-center fw-bold bg-light" style="font-family: monospace; border: 1px solid #dee2e6; width: 30%;">${codigo}</td>
+                        <td class="px-2" style="border: 1px solid #dee2e6; color: var(--bs-body-color);">${datosFiltrados[codigo]}</td>
+                    `;
+                    tbody.appendChild(fila);
+                });
+            }
+
+            // =========================================================================
+            // EXPORTACIÓN AVANZADA DE INVENTARIOS A EXCEL (Estructura XML Nativa)
+            // =========================================================================
+            function exportarAreaAExcel() {
+            // 1. Asegurar que la variable exista e inicie el archivo XML de Excel
+            let xmlExcel = `<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?>
+            <Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+                    xmlns:o="urn:schemas-microsoft-com:office:office"
+                    xmlns:x="urn:schemas-microsoft-com:office:excel"
+                    xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+                <Worksheet ss:Name="Inventario">
+                    <Table>`;
+
+            // 2. Añadir los encabezados de las columnas
+            xmlExcel += `
+                        <Row>
+                            <Cell><Data ss:Type="String">CÓDIGO DE BIEN</Data></Cell>
+                            <Cell><Data ss:Type="String">DESCRIPCIÓN DETALLADA DEL ACTIVO</Data></Cell>
+                        </Row>`;
+
+            // 3. Obtener las filas que están actualmente cargadas en tu tabla limpia
+            const filas = document.querySelectorAll("#cuerpoTablaExcel tr");
+            
+            if (filas.length === 0) {
+                alert("No hay datos en la tabla para exportar.");
+                return;
+            }
+
+            filas.forEach(fila => {
+                const celdas = fila.querySelectorAll("td");
+                if (celdas.length >= 2) {
+                    const codigo = celdas[0].innerText.trim();
+                    const descripcion = celdas[1].innerText.trim();
+                    
+                    xmlExcel += `
+                        <Row>
+                            <Cell><Data ss:Type="String">${codigo}</Data></Cell>
+                            <Cell><Data ss:Type="String">${descripcion}</Data></Cell>
+                        </Row>`;
+                }
+            });
+
+            // 4. Cerrar las etiquetas del documento XML
+            xmlExcel += `</Table></Worksheet></Workbook>`;
+
+            // 5. Generar la descarga agregando el BOM de UTF-8 para corregir las tildes rotas
+            const blob = new Blob(["\ufeff" + xmlExcel], { type: "application/vnd.ms-excel;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            
+            // Obtener el nombre del área activa para el archivo (o dejar uno por defecto)
+            const nombreArea = document.getElementById("nombreAreaTitulo")?.innerText || "Inventario";
+            link.setAttribute("download", `Inventario_${nombreArea.replace(/ /g, "_")}.xls`);
+            link.style.visibility = 'hidden';
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+            // =========================================================================
+            // FUNCIÓN NUCLEAR: PROCESAR E IMPORTAR ARCHIVO EXCEL / CSV (ANSI/UTF-8)
+            // =========================================================================
+            function importarNuevoInventario() {
+                const inputNombre = document.getElementById("nombreNuevaArea");
+                const inputArchivo = document.getElementById("archivoImportar");
+
+                const nombreArea = inputNombre.value.toUpperCase().trim();
+                if (!nombreArea) {
+                    alert("Por favor, introduce un nombre para la nueva área (Ej: RECTORADO).");
+                    return;
+                }
+
+                if (!inputArchivo.files || inputArchivo.files.length === 0) {
+                    alert("Por favor, selecciona un archivo CSV para importar.");
+                    return;
+                }
+
+                const archivo = inputArchivo.files[0];
+                const lector = new FileReader();
+
+                lector.onload = function(e) {
+                    const buffer = e.target.result;
+                    const view = new Uint8Array(buffer);
+                    
+                    let contenido = "";
+                    try {
+                        const decoderUTF8 = new TextDecoder("utf-8", { fatal: true });
+                        contenido = decoderUTF8.decode(view);
+                    } catch (err) {
+                        const decoderANSI = new TextDecoder("iso-8859-1");
+                        contenido = decoderANSI.decode(view);
+                    }
+
+                    const lineas = contenido.split(/\r?\n/);
+                    const nuevoInventarioObejeto = {};
+
+                    for (let i = 1; i < lineas.length; i++) {
+                        const linea = lineas[i].trim();
+                        if (linea === "" || linea.startsWith("sep=")) continue;
+
+                        const separador = linea.includes(";") ? ";" : ",";
+                        const columnas = linea.split(separador);
+
+                        if (columnas.length >= 2) {
+                            const codigo = columnas[0].replace(/["']/g, "").toUpperCase().trim();
+                            let descripcion = columnas.slice(1).join(separador).replace(/["']/g, "").trim();
+                            
+                            if (codigo !== "") {
+                                nuevoInventarioObejeto[codigo] = descripcion;
+                            }
+                        }
+                    }
+
+                    if (Object.keys(nuevoInventarioObejeto).length === 0) {
+                        alert("No se encontraron registros válidos en el archivo. Verifica las columnas.");
+                        return;
+                    }
+
+                    const baseDatosLocal = JSON.parse(localStorage.getItem("unellez_bd_local")) || {};
+                    baseDatosLocal[nombreArea] = nuevoInventarioObejeto;
+                    localStorage.setItem("unellez_bd_local", JSON.stringify(baseDatosLocal));
+
+                    inputNombre.value = "";
+                    inputArchivo.value = "";
+
+                    inicializarSistemaInventarios();
+                    alert(`¡Área "${nombreArea}" importada con éxito y caracteres corregidos!`);
+                };
+
+                lector.readAsArrayBuffer(archivo);
+            }
+
+            function eliminarBaseDatosLocal() {
+                if (confirm("🚨 ¿Estás seguro de que deseas eliminar todas las áreas importadas de la base de datos local?")) {
+                    localStorage.removeItem("unellez_bd_local");
+                    inicializarSistemaInventarios();
+                    document.getElementById('seccionTablaInventario').classList.add('d-none');
+                    alert("Base de datos local limpiada correctamente.");
+                }
+            }
+
+            // =========================================================================
+            // 2. LOGÍSTICA DE FILAS DINÁMICAS Y AUTOCOMPLETADO
+            // =========================================================================
+            const bienUnicoRadio = document.getElementById('bienUnico');
+            const bienVariosRadio = document.getElementById('bienVarios');
+            const btnAgregarBien = document.getElementById('btnAgregarBien');
+            const listaCamposBienes = document.getElementById('listaCamposBienes');
+
+            if (bienUnicoRadio) bienUnicoRadio.addEventListener('change', alternarModoBienes);
+            if (bienVariosRadio) bienVariosRadio.addEventListener('change', alternarModoBienes);
+
+            function alternarModoBienes() {
+                if (bienVariosRadio && bienVariosRadio.checked) {
+                    if (btnAgregarBien) btnAgregarBien.classList.remove('d-none');
+                } else {
+                    if (btnAgregarBien) btnAgregarBien.classList.add('d-none');
+                    if (listaCamposBienes) {
+                        listaCamposBienes.innerHTML = `
+                            <div class="row g-2 mb-2 fila-bien">
+                                <div class="col-md-4">
+                                    <input type="text" class="form-control" placeholder="Código de Bien" required name="codigoBien" oninput="buscarDescripcion(this)">
+                                </div>
+                                <div class="col-md-8">
+                                    <input type="text" class="form-control" placeholder="Descripción" required name="descBien">
+                                </div>
+                            </div>`;
+                    }
+                }
+            }
+
+            // CONFIGURACIÓN DEL BUSCADOR DE ARRIBA: Autocompleta los inputs sin tocar la tabla
+            function buscarDescripcion(inputCodigo) {
+                let codigoInput = inputCodigo.value.toUpperCase().trim();
+                
+                if (codigoInput.startsWith("UNELLEZ") && !codigoInput.includes("-")) {
+                    codigoInput = codigoInput.replace("UNELLEZ", "UNELLEZ-").replace("- ", "-");
+                }
+                
+                const fila = inputCodigo.closest('.fila-bien');
+                const inputDesc = fila.querySelector('input[name="descBien"]');
+                
+                if (BDBienes && BDBienes[codigoInput]) {
+                    inputDesc.value = BDBienes[codigoInput];
+                    inputDesc.style.backgroundColor = "#e8f5e9"; 
+                    inputDesc.style.fontWeight = "500";
+                } else {
+                    inputDesc.style.backgroundColor = ""; 
+                    inputDesc.style.fontWeight = "normal";
+                }
+            }
+
+            if (btnAgregarBien) {
+                btnAgregarBien.addEventListener('click', function() {
+                    const nuevaFila = document.createElement('div');
+                    nuevaFila.className = 'row g-2 mb-2 fila-bien';
+                    nuevaFila.innerHTML = `
+                        <div class="col-md-4">
+                            <input type="text" class="form-control" placeholder="Código de Bien" required name="codigoBien" oninput="buscarDescripcion(this)">
+                        </div>
+                        <div class="col-md-8 d-flex gap-2">
+                            <input type="text" class="form-control" placeholder="Descripción" required name="descBien">
+                            <button type="button" class="btn btn-outline-danger btn-sm" onclick="this.closest('.fila-bien').remove()"><i class="bi bi-trash"></i></button>
+                        </div>`;
+                    if (listaCamposBienes) listaCamposBienes.appendChild(nuevaFila);
+                });
+            }
+
+            const primerInputCodigo = document.querySelector('input[name="codigoBien"]');
+            if (primerInputCodigo) {
+                primerInputCodigo.setAttribute('oninput', 'buscarDescripcion(this)');
+            }
+            
+            // =========================================================================
+            // 3. GENERACIÓN INTEGRAL DEL REPORTE PDF
+            // =========================================================================
+            document.getElementById('formTraslado').addEventListener('submit', function(event) {
+                event.preventDefault();
+            
+                const origenTexto = document.getElementById('origen').value;
+                const destinoTexto = document.getElementById('destino').value;
+                const motivoTexto = document.getElementById('motivo').value;
+                const responsableTexto = document.getElementById('responsable').value;
+                const fechaActual = new Date().toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
+            
+                document.getElementById('pdfOrigen').innerText = origenTexto.toUpperCase();
+                document.getElementById('pdfDestino').innerText = destinoTexto.toUpperCase();
+                document.getElementById('pdfMotivo').innerText = motivoTexto.toUpperCase();
+                document.getElementById('pdfResponsable').innerText = responsableTexto.toUpperCase();
+                document.getElementById('pdfFecha').innerText = fechaActual;
+            
+                const codigosInstancias = document.getElementsByName('codigoBien');
+                const descInstancias = document.getElementsByName('descBien');
+                const pdfTbody = document.getElementById('pdfListaBienes');
+                
+                pdfTbody.innerHTML = '';
+            
+                for (let i = 0; i < codigosInstancias.length; i++) {
+                    if (codigosInstancias[i].value.trim() !== "") {
+                        const fila = document.createElement('tr');
+                        fila.style.borderBottom = '1px solid #dee2e6';
+                        fila.innerHTML = `
+                            <td style="padding: 8px 12px; font-size: 12px; font-family: monospace; font-weight: bold; border-right: 1px solid #dee2e6; color: #333;">${codigosInstancias[i].value.toUpperCase()}</td>
+                            <td style="padding: 8px 12px; font-size: 12px; color: #495057;">${descInstancias[i].value}</td>
+                        `;
+                        pdfTbody.appendChild(fila);
+                    }
+                }
+            
+                const elementoPlantilla = document.getElementById('plantillaPDF');
+                const opciones = {
+                    margin:       15,
+                    filename:     'Traslado_UNELLEZ_' + origenTexto.replace(/ /g, "_") + '.pdf',
+                    image:        { type: 'jpeg', quality: 0.98 },
+                    html2canvas:  { scale: 2, useCORS: true, scrollY: 0 },
+                    jsPDF:        { unit: 'mm', format: 'letter', orientation: 'portrait' },
+                    pagebreak: { 
+                        mode: ['css', 'legacy'], 
+                        before: '.seccion-firmas', 
+                        avoid: ['tr', 'h4'] 
+                    }
+                };
+            
+                html2pdf().set(opciones).from(elementoPlantilla).save();
+            });
+
+            // =========================================================================
+            // 4. CONTROL DE TEMA DINÁMICO (Claro / Oscuro - Bootstrap 5.3)
+            // =========================================================================
+            const selectorTema = document.getElementById('selectorTema');
+            const etiquetaTema = document.getElementById('etiquetaTema');
+            const elHTML = document.documentElement; 
+            
+            const temaGuardado = localStorage.getItem('tema_preferido') || 'light';
+            elHTML.setAttribute('data-bs-theme', temaGuardado);
+            
+            if (temaGuardado === 'dark') {
+                if (selectorTema) selectorTema.checked = true;
+                if (etiquetaTema) etiquetaTema.innerHTML = "☀️ Modo Claro";
+            }
+            
+            if (selectorTema) {
+                selectorTema.addEventListener('change', function() {
+                    if (this.checked) {
+                        elHTML.setAttribute('data-bs-theme', 'dark');
+                        etiquetaTema.innerHTML = "☀️ Modo Claro";
+                        localStorage.setItem('tema_preferido', 'dark');
+                    } else {
+                        elHTML.setAttribute('data-bs-theme', 'light');
+                        etiquetaTema.innerHTML = "🌙 Modo Oscuro";
+                        localStorage.setItem('tema_preferido', 'light');
+                    }
+                });
+            }
+        </script>
+    </body>
+</html>
